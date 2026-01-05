@@ -117,7 +117,8 @@ class LLMClient:
         Returns:
             Dict with either:
             - {"type": "text", "content": str} for regular responses
-            - {"type": "tool_call", "name": str, "arguments": dict} for tool calls
+            - {"type": "tool_call", "name": str, "arguments": dict} for single tool call
+            - {"type": "tool_calls", "calls": [{"name": str, "arguments": dict}, ...]} for multiple tool calls
         """
         if self.provider == "openai":
             return self._chat_with_tools_openai(messages, tools, system_prompt)
@@ -289,8 +290,20 @@ class LLMClient:
         
         message = response.choices[0].message
         
-        # Check if the model wants to call a tool
+        # Check if the model wants to call tools
         if message.tool_calls:
+            # If multiple tool calls, return them all
+            if len(message.tool_calls) > 1:
+                calls = [
+                    {
+                        "name": tc.function.name,
+                        "arguments": json.loads(tc.function.arguments)
+                    }
+                    for tc in message.tool_calls
+                ]
+                return {"type": "tool_calls", "calls": calls}
+            
+            # Single tool call - maintain backward compatibility
             tool_call = message.tool_calls[0]
             return {
                 "type": "tool_call",
@@ -325,14 +338,28 @@ class LLMClient:
             tools=anthropic_tools if anthropic_tools else None
         )
         
-        # Check for tool use
-        for block in response.content:
-            if block.type == "tool_use":
-                return {
-                    "type": "tool_call",
-                    "name": block.name,
-                    "arguments": block.input
-                }
+        # Collect all tool use blocks
+        tool_use_blocks = [block for block in response.content if block.type == "tool_use"]
+        
+        if tool_use_blocks:
+            # If multiple tool calls, return them all
+            if len(tool_use_blocks) > 1:
+                calls = [
+                    {
+                        "name": block.name,
+                        "arguments": block.input
+                    }
+                    for block in tool_use_blocks
+                ]
+                return {"type": "tool_calls", "calls": calls}
+            
+            # Single tool call - maintain backward compatibility
+            block = tool_use_blocks[0]
+            return {
+                "type": "tool_call",
+                "name": block.name,
+                "arguments": block.input
+            }
         
         # Return text content
         for block in response.content:
@@ -357,27 +384,36 @@ class LLMClient:
         enhanced_prompt = system_prompt or ""
         if tools:
             enhanced_prompt += f"\n\nYou have access to these tools:\n{tool_descriptions}\n"
-            enhanced_prompt += "If you need to use a tool, respond with: TOOL_CALL: tool_name(arg1=value1, arg2=value2)"
+            enhanced_prompt += "If you need to use tools, respond with: TOOL_CALL: tool_name(arg1=value1, arg2=value2)"
+            enhanced_prompt += "\nYou can make multiple tool calls by putting each on its own line."
         
         response_text = self._chat_google(messages, enhanced_prompt)
         
         # Parse for tool calls
         if "TOOL_CALL:" in response_text:
             import re
-            match = re.search(r'TOOL_CALL:\s*(\w+)\((.*?)\)', response_text)
-            if match:
-                tool_name = match.group(1)
-                args_str = match.group(2)
-                # Parse simple arg=value pairs
-                arguments = {}
-                for arg in args_str.split(','):
-                    if '=' in arg:
-                        key, value = arg.split('=', 1)
-                        arguments[key.strip()] = value.strip().strip('"\'')
+            matches = re.findall(r'TOOL_CALL:\s*(\w+)\((.*?)\)', response_text)
+            
+            if matches:
+                calls = []
+                for tool_name, args_str in matches:
+                    # Parse simple arg=value pairs
+                    arguments = {}
+                    for arg in args_str.split(','):
+                        if '=' in arg:
+                            key, value = arg.split('=', 1)
+                            arguments[key.strip()] = value.strip().strip('"\'')
+                    calls.append({"name": tool_name, "arguments": arguments})
+                
+                # If multiple tool calls, return them all
+                if len(calls) > 1:
+                    return {"type": "tool_calls", "calls": calls}
+                
+                # Single tool call - maintain backward compatibility
                 return {
                     "type": "tool_call",
-                    "name": tool_name,
-                    "arguments": arguments
+                    "name": calls[0]["name"],
+                    "arguments": calls[0]["arguments"]
                 }
         
         return {"type": "text", "content": response_text}

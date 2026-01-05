@@ -197,7 +197,61 @@ class MongoAgent:
         # First call to LLM
         result = self._llm.chat_with_tools(messages, tools, system_prompt)
         
-        # If it's a tool call, execute it and get the result
+        # Handle multiple tool calls
+        if result["type"] == "tool_calls":
+            tool_results = []
+            
+            for call in result["calls"]:
+                tool_name = call["name"]
+                tool_args = call["arguments"]
+                
+                if tool_name in self._tools:
+                    try:
+                        # Execute the tool
+                        tool_result = self._tools[tool_name]["func"](**tool_args)
+                        tool_results.append({
+                            "tool": tool_name,
+                            "success": True,
+                            "result": tool_result
+                        })
+                    except Exception as e:
+                        tool_results.append({
+                            "tool": tool_name,
+                            "success": False,
+                            "error": str(e)
+                        })
+                else:
+                    tool_results.append({
+                        "tool": tool_name,
+                        "success": False,
+                        "error": f"Tool '{tool_name}' is not available"
+                    })
+            
+            # Build a summary of all tool executions
+            tool_summary_parts = []
+            for tr in tool_results:
+                if tr["success"]:
+                    tool_summary_parts.append(f"Tool '{tr['tool']}' result: {tr['result']}")
+                else:
+                    tool_summary_parts.append(f"Tool '{tr['tool']}' failed: {tr['error']}")
+            
+            tool_summary = "\n".join(tool_summary_parts)
+            
+            # Add tool results to messages and get final response
+            messages.append({
+                "role": "assistant",
+                "content": f"I'll use multiple tools to help answer this."
+            })
+            messages.append({
+                "role": "user",
+                "content": f"Tool results:\n{tool_summary}"
+            })
+            
+            # Get final response incorporating all tool results
+            final_response = self._llm.chat(messages, system_prompt=system_prompt)
+            return final_response
+        
+        # Handle single tool call (backward compatibility)
         if result["type"] == "tool_call":
             tool_name = result["name"]
             tool_args = result["arguments"]
