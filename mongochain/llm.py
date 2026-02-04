@@ -6,7 +6,7 @@ from typing import Optional, Generator
 class LLMClient:
     """Unified interface for multiple LLM providers.
     
-    Supports OpenAI, Anthropic Claude, and Google Gemini with a consistent API.
+    Supports OpenAI, Azure OpenAI, Anthropic Claude, and Google Gemini with a consistent API.
     
     Attributes:
         provider: The LLM provider being used
@@ -15,20 +15,32 @@ class LLMClient:
     
     PROVIDERS = {
         "openai": {"default_model": "gpt-4o-mini"},
+        "azure_openai": {"default_model": None},  # Model/deployment specified by user
         "anthropic": {"default_model": "claude-3-haiku-20240307"},
         "google": {"default_model": "gemini-1.5-flash"},
     }
     
-    def __init__(self, provider: str, api_key: str, model: Optional[str] = None):
+    def __init__(
+        self,
+        provider: str,
+        api_key: str,
+        model: Optional[str] = None,
+        azure_endpoint: Optional[str] = None,
+        azure_api_version: str = "2024-02-15-preview"
+    ):
         """Initialize the LLM client.
         
         Args:
-            provider: LLM provider ("openai", "anthropic", or "google")
+            provider: LLM provider ("openai", "azure_openai", "anthropic", or "google")
             api_key: API key for the provider
-            model: Specific model to use (uses provider default if None)
+            model: Specific model to use (uses provider default if None).
+                   For azure_openai, this is the deployment name (required).
+            azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai)
+                           Example: "https://your-resource.openai.azure.com/"
+            azure_api_version: Azure OpenAI API version (default: "2024-02-15-preview")
             
         Raises:
-            ValueError: If provider is not supported
+            ValueError: If provider is not supported or Azure config is missing
         """
         if provider not in self.PROVIDERS:
             raise ValueError(
@@ -36,9 +48,23 @@ class LLMClient:
                 f"Must be one of: {', '.join(self.PROVIDERS.keys())}"
             )
         
+        # Validate Azure OpenAI requirements
+        if provider == "azure_openai":
+            if not azure_endpoint:
+                raise ValueError(
+                    "azure_endpoint is required for 'azure_openai' provider. "
+                    "Example: 'https://your-resource.openai.azure.com/'"
+                )
+            if not model:
+                raise ValueError(
+                    "model (deployment name) is required for 'azure_openai' provider."
+                )
+        
         self.provider = provider
         self.model = model or self.PROVIDERS[provider]["default_model"]
         self._api_key = api_key
+        self._azure_endpoint = azure_endpoint
+        self._azure_api_version = azure_api_version
         self._client = None
         
         # Initialize the appropriate client
@@ -49,6 +75,14 @@ class LLMClient:
         if self.provider == "openai":
             from openai import OpenAI
             self._client = OpenAI(api_key=self._api_key)
+        
+        elif self.provider == "azure_openai":
+            from openai import AzureOpenAI
+            self._client = AzureOpenAI(
+                api_key=self._api_key,
+                azure_endpoint=self._azure_endpoint,
+                api_version=self._azure_api_version
+            )
             
         elif self.provider == "anthropic":
             import anthropic
@@ -73,7 +107,7 @@ class LLMClient:
         Returns:
             The assistant's response text
         """
-        if self.provider == "openai":
+        if self.provider in ("openai", "azure_openai"):
             return self._chat_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_anthropic(messages, system_prompt)
@@ -94,7 +128,7 @@ class LLMClient:
         Yields:
             Chunks of the assistant's response text
         """
-        if self.provider == "openai":
+        if self.provider in ("openai", "azure_openai"):
             yield from self._stream_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             yield from self._stream_anthropic(messages, system_prompt)
@@ -120,7 +154,7 @@ class LLMClient:
             - {"type": "tool_call", "name": str, "arguments": dict} for single tool call
             - {"type": "tool_calls", "calls": [{"name": str, "arguments": dict}, ...]} for multiple tool calls
         """
-        if self.provider == "openai":
+        if self.provider in ("openai", "azure_openai"):
             return self._chat_with_tools_openai(messages, tools, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_with_tools_anthropic(messages, tools, system_prompt)

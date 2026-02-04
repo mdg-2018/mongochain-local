@@ -14,9 +14,11 @@ class AgentConfig:
         mongo_uri: MongoDB Atlas connection string
         voyage_api_key: Voyage AI API key for embeddings
         llm_api_key: API key for the chosen LLM provider
-        llm_provider: LLM provider ("openai", "anthropic", or "google")
+        llm_provider: LLM provider ("openai", "anthropic", "google", or "azure_openai")
         llm_model: Specific model to use (uses provider default if None)
         collaborators: List of agent names this agent can read memories from
+        azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai provider)
+        azure_api_version: Azure OpenAI API version (default: "2024-02-15-preview")
     """
     name: str
     persona: str
@@ -26,14 +28,23 @@ class AgentConfig:
     llm_provider: str = "openai"
     llm_model: Optional[str] = None
     collaborators: list[str] = field(default_factory=list)
+    azure_endpoint: Optional[str] = None
+    azure_api_version: str = "2024-02-15-preview"
     
     def __post_init__(self):
         """Validate configuration after initialization."""
-        valid_providers = {"openai", "anthropic", "google"}
+        valid_providers = {"openai", "anthropic", "google", "azure_openai"}
         if self.llm_provider not in valid_providers:
             raise ValueError(
                 f"Invalid llm_provider '{self.llm_provider}'. "
                 f"Must be one of: {', '.join(valid_providers)}"
+            )
+        
+        # Azure OpenAI requires endpoint
+        if self.llm_provider == "azure_openai" and not self.azure_endpoint:
+            raise ValueError(
+                "azure_endpoint is required when using 'azure_openai' provider. "
+                "Example: 'https://your-resource.openai.azure.com/'"
             )
         
         if not self.name:

@@ -36,7 +36,9 @@ class MongoAgent:
         llm_provider: str = "openai",
         llm_model: Optional[str] = None,
         collaborators: Optional[list[str]] = None,
-        memory_config: Optional[MemoryConfig] = None
+        memory_config: Optional[MemoryConfig] = None,
+        azure_endpoint: Optional[str] = None,
+        azure_api_version: str = "2024-02-15-preview"
     ):
         """Initialize a MongoAgent.
         
@@ -46,10 +48,14 @@ class MongoAgent:
             mongo_uri: MongoDB Atlas connection string
             voyage_api_key: Voyage AI API key for embeddings
             llm_api_key: API key for the LLM provider
-            llm_provider: LLM provider ("openai", "anthropic", or "google")
-            llm_model: Specific model to use (uses provider default if None)
+            llm_provider: LLM provider ("openai", "azure_openai", "anthropic", or "google")
+            llm_model: Specific model to use (uses provider default if None).
+                       For azure_openai, this is the deployment name (required).
             collaborators: List of agent names this agent can read memories from
             memory_config: Optional memory configuration
+            azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai provider)
+                           Example: "https://your-resource.openai.azure.com/"
+            azure_api_version: Azure OpenAI API version (default: "2024-02-15-preview")
         """
         self._config = AgentConfig(
             name=name,
@@ -59,7 +65,9 @@ class MongoAgent:
             llm_api_key=llm_api_key,
             llm_provider=llm_provider,
             llm_model=llm_model,
-            collaborators=collaborators or []
+            collaborators=collaborators or [],
+            azure_endpoint=azure_endpoint,
+            azure_api_version=azure_api_version
         )
         
         self.name = name
@@ -72,7 +80,9 @@ class MongoAgent:
         self._llm = LLMClient(
             provider=llm_provider,
             api_key=llm_api_key,
-            model=llm_model
+            model=llm_model,
+            azure_endpoint=azure_endpoint,
+            azure_api_version=azure_api_version
         )
         self._memory = MemoryStore(
             mongo_uri=mongo_uri,
