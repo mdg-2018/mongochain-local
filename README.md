@@ -19,15 +19,23 @@ Embeddings are handled by **MongoDB Atlas Vector Search Automated Embedding** (`
 
 ## Installation
 
+Use a virtual environment. This avoids conflicts with system-managed Python installations (e.g., Homebrew, apt), which can fail during dependency upgrades with errors like *"Cannot uninstall typing_extensions ... no RECORD file"*.
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install git+https://github.com/robin-mongodb/mongochain.git
 ```
 
 Or install from source:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
+
+Running in Google Colab? Skip the venv — Colab already provides an isolated environment. Just `%pip install git+https://github.com/robin-mongodb/mongochain.git` in a cell.
 
 ## Quick Start
 
