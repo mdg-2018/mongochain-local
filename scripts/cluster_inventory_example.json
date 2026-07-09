@@ -1,0 +1,159 @@
+[
+  {
+    "database": "Santa_360",
+    "collection": "behaviorEvents",
+    "description": "Collection Santa_360.behaviorEvents with top-level fields: childKey, at, type, points, event, source",
+    "schemaSummary": {"childKey": "str", "at": "datetime", "type": "str", "points": "int", "event": "str", "source": "str"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "childKey_1_at_-1", "key": {"childKey": 1, "at": -1}},
+      {"name": "at_-1", "key": {"at": -1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "Santa_360",
+    "collection": "children",
+    "description": "Collection Santa_360.children with profile, naughtyScore, niceScore, status, lettersByYear",
+    "schemaSummary": {"childKey": "str", "profile": {"firstName": "str", "lastName": "str", "age": "int", "address": "object", "location": "object"}, "naughtyScore": "int", "niceScore": "int", "status": "str", "lastLetterAt": "datetime", "lettersByYear": "array", "createdAt": "datetime", "updatedAt": "datetime"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "childKey_1", "key": {"childKey": 1}},
+      {"name": "profile.address.city_1_profile.address.country_1", "key": {"profile.address.city": 1, "profile.address.country": 1}},
+      {"name": "lastLetterAt_-1", "key": {"lastLetterAt": -1}},
+      {"name": "profile.age_1", "key": {"profile.age": 1}},
+      {"name": "profile.location_2dsphere", "key": {"profile.location": "2dsphere"}},
+      {"name": "status_1", "key": {"status": 1}},
+      {"name": "profile.firstName_1_profile.lastName_1", "key": {"profile.firstName": 1, "profile.lastName": 1}},
+      {"name": "naughtyScore_-1", "key": {"naughtyScore": -1}},
+      {"name": "niceScore_-1", "key": {"niceScore": -1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "Santa_360",
+    "collection": "aboveFive",
+    "description": "View: children with niceScore > 5",
+    "schemaSummary": null,
+    "indexes": [],
+    "isView": true
+  },
+  {
+    "database": "Santa_360",
+    "collection": "nice",
+    "description": "View: filtered behavior/children data",
+    "schemaSummary": null,
+    "indexes": [],
+    "isView": true
+  },
+  {
+    "database": "Swarm",
+    "collection": "users",
+    "description": "Collection Swarm.users with top-level fields: email, password, name",
+    "schemaSummary": {"email": "str", "password": "str", "name": "str"},
+    "indexes": [{"name": "_id_", "key": {"_id": 1}}],
+    "isView": false
+  },
+  {
+    "database": "paymentsData",
+    "collection": "payments",
+    "description": "Payment messages with pmntDtls, pmntIds, pmntAcct, pmntJrnySumm (ISO 20022-style)",
+    "schemaSummary": {"pmntDtls": "object", "pmntIds": "object", "adtlInf": "object", "metaData": "object", "pmntAcct": "array", "pmntPrtry": "array", "pmntChrg": "object", "pmntJrnySumm": "object"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "pmntDtls.pmntEvntKey_1", "key": {"pmntDtls.pmntEvntKey": 1}},
+      {"name": "pmntAcct.acctIban_-1", "key": {"pmntAcct.acctIban": -1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "payment_benchmark",
+    "collection": "payment_messages",
+    "description": "Benchmark payment messages with sender, receiver, amount, status, network_info",
+    "schemaSummary": {"message_id": "str", "transaction_id": "str", "status": "str", "amount": "object", "sender": "object", "receiver": "object", "created_at": "datetime"},
+    "indexes": [{"name": "_id_", "key": {"_id": 1}}],
+    "isView": false
+  },
+  {
+    "database": "sample_airbnb",
+    "collection": "listingsAndReviews",
+    "description": "Airbnb listings with address, host, reviews, availability, review_scores",
+    "schemaSummary": {"listing_url": "str", "name": "str", "address": "object", "host": "object", "reviews": "array", "price": "decimal", "amenities": "array"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "name_1", "key": {"name": 1}},
+      {"name": "address.location_2dsphere", "key": {"address.location": "2dsphere"}},
+      {"name": "property_type_1_room_type_1_beds_1", "key": {"property_type": 1, "room_type": 1, "beds": 1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "sample_mflix",
+    "collection": "movies",
+    "description": "Movies with plot, genres, cast, directors, imdb, tomatoes",
+    "schemaSummary": {"plot": "str", "genres": "array", "title": "str", "cast": "array", "imdb": "object", "released": "datetime"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "cast_text_fullplot_text_genres_text_title_text", "key": {"_fts": "text", "_ftsx": 1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "sample_geospatial",
+    "collection": "shipwrecks",
+    "description": "Shipwreck records with coordinates, depth, history",
+    "schemaSummary": {"recrd": "str", "coordinates": "array", "depth": "int", "latdec": "float", "londec": "float"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "coordinates_2dsphere", "key": {"coordinates": "2dsphere"}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "sample_analytics",
+    "collection": "accounts",
+    "description": "Bank accounts with account_id, limit, products",
+    "schemaSummary": {"account_id": "int", "limit": "int", "products": "array"},
+    "indexes": [{"name": "_id_", "key": {"_id": 1}}],
+    "isView": false
+  },
+  {
+    "database": "sample_analytics",
+    "collection": "transactions",
+    "description": "Bucketed transactions by account and date range",
+    "schemaSummary": {"account_id": "int", "transaction_count": "int", "bucket_start_date": "datetime", "transactions": "array"},
+    "indexes": [{"name": "_id_", "key": {"_id": 1}}],
+    "isView": false
+  },
+  {
+    "database": "smart_gift_finder",
+    "collection": "product_catalog",
+    "description": "Products with name, category, price, embedding, searchable_text",
+    "schemaSummary": {"name": "str", "category": "str", "price": "float", "description": "str", "tags": "array", "embedding": "array", "searchable_text": "str"},
+    "indexes": [{"name": "_id_", "key": {"_id": 1}}],
+    "isView": false
+  },
+  {
+    "database": "langmem_demo",
+    "collection": "agent_memories",
+    "description": "Agent memories with namespace, key, value, embedding",
+    "schemaSummary": {"namespace": "array", "key": "str", "value": "object", "embedding": "array", "created_at": "datetime"},
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "namespace_1_key_1", "key": {"namespace": 1, "key": 1}}
+    ],
+    "isView": false
+  },
+  {
+    "database": "research_assistant",
+    "collection": "conversation_history",
+    "description": "Conversation history for research assistant agent",
+    "schemaSummary": null,
+    "indexes": [
+      {"name": "_id_", "key": {"_id": 1}},
+      {"name": "expires_at_1", "key": {"expires_at": 1}},
+      {"name": "user_id_1_timestamp_1", "key": {"user_id": 1, "timestamp": 1}}
+    ],
+    "isView": false
+  }
+]
