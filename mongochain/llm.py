@@ -18,7 +18,10 @@ class LLMClient:
         "azure_openai": {"default_model": None},  # Model/deployment specified by user
         "anthropic": {"default_model": "claude-3-haiku-20240307"},
         "google": {"default_model": "gemini-1.5-flash"},
+        "grove": {"default_model": "gpt-4o-mini"},
     }
+
+    GROVE_BASE_URL = "https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1"
     
     def __init__(
         self,
@@ -92,6 +95,15 @@ class LLMClient:
             import google.generativeai as genai
             genai.configure(api_key=self._api_key)
             self._client = genai.GenerativeModel(self.model)
+
+        elif self.provider == "grove":
+            from openai import OpenAI
+            # ponytail: Grove is OpenAI-compatible; reuse OpenAI SDK with base_url + api-key header
+            self._client = OpenAI(
+                api_key="unused",
+                base_url=self.GROVE_BASE_URL,
+                default_headers={"api-key": self._api_key},
+            )
     
     def chat(
         self,
@@ -107,7 +119,7 @@ class LLMClient:
         Returns:
             The assistant's response text
         """
-        if self.provider in ("openai", "azure_openai"):
+        if self.provider in ("openai", "azure_openai", "grove"):
             return self._chat_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_anthropic(messages, system_prompt)
@@ -128,7 +140,7 @@ class LLMClient:
         Yields:
             Chunks of the assistant's response text
         """
-        if self.provider in ("openai", "azure_openai"):
+        if self.provider in ("openai", "azure_openai", "grove"):
             yield from self._stream_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             yield from self._stream_anthropic(messages, system_prompt)
@@ -154,7 +166,7 @@ class LLMClient:
             - {"type": "tool_call", "name": str, "arguments": dict} for single tool call
             - {"type": "tool_calls", "calls": [{"name": str, "arguments": dict}, ...]} for multiple tool calls
         """
-        if self.provider in ("openai", "azure_openai"):
+        if self.provider in ("openai", "azure_openai", "grove"):
             return self._chat_with_tools_openai(messages, tools, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_with_tools_anthropic(messages, tools, system_prompt)
