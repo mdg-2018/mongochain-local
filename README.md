@@ -2,16 +2,19 @@
 
 A simple Python agent framework that uses **MongoDB Atlas** as the memory layer, demonstrating how MongoDB can power stateful AI agents with user-specific memories.
 
+Embeddings are handled by **MongoDB Atlas Vector Search Automated Embedding** (`autoEmbed`) — Atlas generates and manages Voyage AI embeddings server-side at index-time and query-time. You don't need a Voyage AI API key.
+
 ## Features
 
 - **User-Specific Memory**: All memories tied to user email/ID
 - **Three Memory Types**:
-  - `conversation_history` - Raw chat log with embeddings (90-day TTL)
-  - `short_term_memory` - Session summaries (7-day TTL)
-  - `long_term_memory` - Persistent user facts (no TTL, vector search)
+  - `conversation_history` — Raw chat log (90-day TTL)
+  - `short_term_memory` — Session summaries (7-day TTL)
+  - `long_term_memory` — Persistent user facts (no TTL)
+- **Automated Embedding**: Atlas generates and manages vector embeddings — no client-side embedding code or API key
 - **Auto-Extraction**: LLM automatically extracts and stores user facts
 - **Dynamic Personas**: Change agent personality on the fly
-- **Multi-Provider LLM**: Works with OpenAI, Anthropic, and Google
+- **Multi-Provider LLM**: Works with OpenAI, Azure OpenAI, Anthropic, Google, and Grove
 - **Multi-Agent Collaboration**: Agents can share user memories
 
 ## Installation
@@ -36,7 +39,6 @@ agent = MongoAgent(
     name="assistant",
     persona="You are a helpful research assistant.",
     mongo_uri="mongodb+srv://...",
-    voyage_api_key="voy-...",
     llm_api_key="sk-..."
 )
 
@@ -48,7 +50,6 @@ response = agent.chat(
 print(response)
 
 # The agent automatically extracts and stores user facts!
-# Check what it learned:
 memories = agent.get_user_memories("user@example.com")
 for m in memories:
     print(f"- {m['content']}")
@@ -56,72 +57,88 @@ for m in memories:
 
 ## Memory Architecture
 
-Each agent creates a MongoDB database with three collections:
+Each agent creates a MongoDB database with these collections. Vector search uses Atlas Automated Embedding on the text field noted below.
 
-| Collection             | Purpose                  | TTL     | Features              |
-| ---------------------- | ------------------------ | ------- | --------------------- |
-| `conversation_history` | Raw chat with embeddings | 90 days | Vector search enabled |
-| `short_term_memory`    | Session summaries        | 7 days  | Vector search enabled |
-| `long_term_memory`     | Persistent user facts    | None    | Vector search enabled |
+| Collection             | Purpose               | TTL     | Auto-embedded field |
+| ---------------------- | --------------------- | ------- | ------------------- |
+| `conversation_history` | Raw chat messages     | 90 days | `content`           |
+| `short_term_memory`    | Session summaries     | 7 days  | `summary`           |
+| `long_term_memory`     | Persistent user facts | None    | `content`           |
 
 All memories are **user-specific** (filtered by `user_id`).
+
+## Atlas Requirements for Automated Embedding
+
+- **M0 (Free) or Flex tier**: works out of the box.
+- **Dedicated (M10+)**: requires **Compute Auto-Scale** enabled (Atlas UI → Edit Configuration → Auto-scale cluster tier). Storage auto-scale is also recommended.
+  - Current M10/M20 → set max instance size to M30 or higher.
+  - Current M30+ → set max at least one tier higher.
+
+If auto-scale is not enabled on a dedicated cluster, agent creation prints a clear failure line naming which vector index couldn't be created and why.
+
+## Choosing an Embedding Model
+
+Default is `voyage-4`. Override via the `embedding_model` kwarg:
+
+```python
+agent = MongoAgent(
+    name="assistant",
+    persona="...",
+    mongo_uri=MONGO_URI,
+    llm_api_key=LLM_KEY,
+    embedding_model="voyage-4-large",  # or "voyage-4-lite", "voyage-code-3"
+)
+```
 
 ## Storing User Memories
 
 ### Automatic (via LLM)
 
-The agent automatically extracts significant facts from conversations:
+The agent extracts significant facts from conversations:
 
 ```python
-# User mentions their job - automatically stored
 agent.chat("user@example.com", "I'm a senior engineer at Acme Corp")
 ```
 
 ### Manual
 
 ```python
-# Store a specific fact
 agent.store_user_memory(
     user_id="user@example.com",
     content="User prefers detailed technical explanations",
-    category="preference"
+    category="preference",
 )
 ```
 
 ## Dynamic Personas
 
 ```python
-# Change persona on the fly
 agent.set_persona("You are a grumpy professor who gives brief answers.")
-response = agent.chat("user@example.com", "Explain indexing")
+agent.chat("user@example.com", "Explain indexing")
 
 agent.set_persona("You are a pirate who explains things with nautical metaphors.")
-response = agent.chat("user@example.com", "Explain indexing")  # Different style!
+agent.chat("user@example.com", "Explain indexing")  # Different style!
 ```
 
 ## Multi-Agent Collaboration
 
 ```python
-# Create Alice - a research specialist
 alice = MongoAgent(
     name="alice",
     persona="You are a research specialist.",
     mongo_uri=MONGO_URI,
-    voyage_api_key=VOYAGE_KEY,
-    llm_api_key=LLM_KEY
+    llm_api_key=LLM_KEY,
 )
 
-# Create Bob - can access Alice's memories
+# Bob can read Alice's user memories
 bob = MongoAgent(
     name="bob",
     persona="You are a summarization expert.",
     mongo_uri=MONGO_URI,
-    voyage_api_key=VOYAGE_KEY,
     llm_api_key=LLM_KEY,
-    collaborators=["alice"]  # Bob can read Alice's user memories
+    collaborators=["alice"],
 )
 
-# Bob can now access what Alice knows about users
 response = bob.chat("user@example.com", "What has Alice learned about me?")
 ```
 
@@ -129,49 +146,54 @@ response = bob.chat("user@example.com", "What has Alice learned about me?")
 
 ```python
 # OpenAI (default)
-agent = MongoAgent(name="assistant", llm_provider="openai", ...)
+agent = MongoAgent(name="assistant", llm_provider="openai", llm_api_key="sk-...", ...)
 
 # Anthropic Claude
-agent = MongoAgent(
-    name="assistant",
-    llm_provider="anthropic",
-    llm_api_key="sk-ant-...",
-    ...
-)
+agent = MongoAgent(name="assistant", llm_provider="anthropic", llm_api_key="sk-ant-...", ...)
 
 # Google Gemini
 agent = MongoAgent(
     name="assistant",
     llm_provider="google",
     llm_api_key="AIza...",
-    llm_model="gemini-1.5-pro",  # Optional: override default model
+    llm_model="gemini-1.5-pro",
     ...
 )
+
+# Azure OpenAI (deployment name goes in llm_model)
+agent = MongoAgent(
+    name="assistant",
+    llm_provider="azure_openai",
+    llm_api_key="...",
+    llm_model="my-deployment",
+    azure_endpoint="https://your-resource.openai.azure.com/",
+    ...
+)
+
+# Grove (LLM gateway)
+agent = MongoAgent(name="assistant", llm_provider="grove", llm_api_key="...", ...)
 ```
 
 ## Session Management
 
 ```python
-# End session to save summary to short-term memory
 agent.end_session("user@example.com")
 
-# Get user stats
 stats = agent.get_user_stats("user@example.com")
 print(f"Conversations: {stats['conversation_count']}")
 print(f"Short-term summaries: {stats['short_term_count']}")
 print(f"Long-term facts: {stats['long_term_count']}")
 
-# Clear user memories
 agent.clear_user_memories("user@example.com", memory_type="conversation")
 ```
 
 ## Requirements
 
 - Python 3.10+
-- MongoDB Atlas cluster (for vector search support)
-- API keys for:
-  - Voyage AI (embeddings)
-  - Your chosen LLM provider (OpenAI, Anthropic, or Google)
+- MongoDB Atlas cluster (M0, Flex, or M10+ with Compute Auto-Scale)
+- API key for your chosen LLM provider (OpenAI, Azure OpenAI, Anthropic, Google, or Grove)
+
+No Voyage AI API key required — Atlas manages embeddings for you.
 
 ## License
 
