@@ -68,43 +68,45 @@ class MemoryStore:
                 self._db.create_collection(coll_name)
                 status["collections_created"].append(coll_name)
 
-        # === Conversation History ===
         self._conversation.create_index("expires_at", expireAfterSeconds=0)
         status["indexes_created"].append(f"{self.CONVERSATION}.expires_at (TTL)")
         self._conversation.create_index([("user_id", ASCENDING), ("timestamp", ASCENDING)])
         status["indexes_created"].append(f"{self.CONVERSATION}.user_id+timestamp")
-        status["vector_index_status"].append(
-            f"conversation_history: {self._create_auto_embed_index(self._conversation, 'conversation_vector_index', self.CONVERSATION_TEXT_FIELD)}"
-        )
+        status["vector_index_status"].append({
+            "collection": self.CONVERSATION,
+            **self._create_auto_embed_index(self._conversation, "conversation_vector_index", self.CONVERSATION_TEXT_FIELD),
+        })
 
-        # === Short-Term Memory ===
         self._short_term.create_index("expires_at", expireAfterSeconds=0)
         status["indexes_created"].append(f"{self.SHORT_TERM}.expires_at (TTL)")
         self._short_term.create_index([("user_id", ASCENDING), ("created_at", ASCENDING)])
         status["indexes_created"].append(f"{self.SHORT_TERM}.user_id+created_at")
-        status["vector_index_status"].append(
-            f"short_term_memory: {self._create_auto_embed_index(self._short_term, 'short_term_vector_index', self.SHORT_TERM_TEXT_FIELD)}"
-        )
+        status["vector_index_status"].append({
+            "collection": self.SHORT_TERM,
+            **self._create_auto_embed_index(self._short_term, "short_term_vector_index", self.SHORT_TERM_TEXT_FIELD),
+        })
 
-        # === Long-Term Memory ===
         self._long_term.create_index([("user_id", ASCENDING), ("timestamp", ASCENDING)])
         status["indexes_created"].append(f"{self.LONG_TERM}.user_id+timestamp")
-        status["vector_index_status"].append(
-            f"long_term_memory: {self._create_auto_embed_index(self._long_term, 'long_term_vector_index', self.LONG_TERM_TEXT_FIELD)}"
-        )
+        status["vector_index_status"].append({
+            "collection": self.LONG_TERM,
+            **self._create_auto_embed_index(self._long_term, "long_term_vector_index", self.LONG_TERM_TEXT_FIELD),
+        })
 
         return status
 
-    def _create_auto_embed_index(self, collection, index_name: str, path: str) -> str:
+    def _create_auto_embed_index(self, collection, index_name: str, path: str) -> dict:
         """Create an Atlas Vector Search index using autoEmbed on the text field.
 
         Atlas generates and manages embeddings for `path` at index- and query-time
         using the configured Voyage AI model. No API key handling on our side.
+
+        Returns a dict: {"name": ..., "status": "created"|"exists"|"failed", "error": str|None}.
         """
         try:
             for idx in collection.list_search_indexes():
                 if idx.get("name") == index_name:
-                    return f"'{index_name}' already exists"
+                    return {"name": index_name, "status": "exists", "error": None}
         except OperationFailure:
             pass
 
@@ -119,7 +121,6 @@ class MemoryStore:
                 {"type": "filter", "path": "user_id"},
             ]
         }
-        # long_term also filters by category
         if collection.name == self.LONG_TERM:
             definition["fields"].append({"type": "filter", "path": "category"})
 
@@ -129,11 +130,13 @@ class MemoryStore:
                 "type": "vectorSearch",
                 "definition": definition,
             })
-            return f"'{index_name}' created (autoEmbed, model={self.config.embedding_model})"
+            return {"name": index_name, "status": "created", "error": None}
         except OperationFailure as e:
-            if "already exists" in str(e).lower():
-                return f"'{index_name}' already exists"
-            return f"'{index_name}' note: {str(e)}"
+            msg = getattr(e, "details", {}).get("errmsg") if hasattr(e, "details") else None
+            msg = msg or str(e)
+            if "already exists" in msg.lower():
+                return {"name": index_name, "status": "exists", "error": None}
+            return {"name": index_name, "status": "failed", "error": msg}
 
     # ==================== Conversation History ====================
 

@@ -113,11 +113,17 @@ class MongoAgent:
             description=None,
         )
 
-        print(f"Agent: {self.name} created. Check database '{self._config.db_name}' in your MongoDB cluster.")
-        if status["collections_created"]:
-            print(f"  Collections created: {', '.join(status['collections_created'])}")
-        for vs in status["vector_index_status"]:
-            print(f"  Vector index - {vs}")
+        vs = status["vector_index_status"]
+        failed = [v for v in vs if v["status"] == "failed"]
+        ok = [v for v in vs if v["status"] in ("created", "exists")]
+
+        print(f"Agent: {self.name} → database '{self._config.db_name}'")
+        if failed:
+            print(f"  Vector indexes: {len(ok)}/{len(vs)} ready. FAILED on {len(failed)}:")
+            for v in failed:
+                print(f"    - {v['collection']}: {v['error']}")
+        else:
+            print(f"  Vector indexes: {len(ok)}/{len(vs)} ready (autoEmbed, model={self._memory.config.embedding_model})")
 
     def chat(self, user_id: str, message: str) -> str:
         """Send a message and get a response."""
