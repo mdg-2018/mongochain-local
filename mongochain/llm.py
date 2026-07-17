@@ -19,7 +19,7 @@ class LLMClient:
         "anthropic": {"default_model": "claude-3-haiku-20240307"},
         "google": {"default_model": "gemini-1.5-flash"},
         "grove": {"default_model": "gpt-4o-mini"},
-        "ollama": {"default_model": "phi4-mini"},
+        "ollama": {"default_model": "qwen2.5:3b-instruct"},
     }
 
     GROVE_BASE_URL = "https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1"
