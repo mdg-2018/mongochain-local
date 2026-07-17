@@ -13,7 +13,7 @@ class AgentConfig:
         persona: The agent's personality/system prompt
         mongo_uri: MongoDB Atlas connection string
         llm_api_key: API key for the chosen LLM provider
-        llm_provider: LLM provider ("openai", "anthropic", "google", or "azure_openai")
+        llm_provider: LLM provider ("openai", "anthropic", "google", "azure_openai", "grove", or "ollama")
         llm_model: Specific model to use (uses provider default if None)
         collaborators: List of agent names this agent can read memories from
         azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai provider)
@@ -33,7 +33,7 @@ class AgentConfig:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        valid_providers = {"openai", "anthropic", "google", "azure_openai", "grove"}
+        valid_providers = {"openai", "anthropic", "google", "azure_openai", "grove", "ollama"}
         if self.llm_provider not in valid_providers:
             raise ValueError(
                 f"Invalid llm_provider '{self.llm_provider}'. "

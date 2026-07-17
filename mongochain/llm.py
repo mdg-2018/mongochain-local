@@ -6,7 +6,7 @@ from typing import Optional, Generator
 class LLMClient:
     """Unified interface for multiple LLM providers.
     
-    Supports OpenAI, Azure OpenAI, Anthropic Claude, and Google Gemini with a consistent API.
+    Supports OpenAI-compatible providers plus Anthropic Claude and Google Gemini with a consistent API.
     
     Attributes:
         provider: The LLM provider being used
@@ -19,9 +19,11 @@ class LLMClient:
         "anthropic": {"default_model": "claude-3-haiku-20240307"},
         "google": {"default_model": "gemini-1.5-flash"},
         "grove": {"default_model": "gpt-4o-mini"},
+        "ollama": {"default_model": "phi4-mini"},
     }
 
     GROVE_BASE_URL = "https://grove-gateway-prod.azure-api.net/grove-foundry-prod/openai/v1"
+    OLLAMA_BASE_URL = "http://localhost:11434/v1"
     
     def __init__(
         self,
@@ -29,18 +31,21 @@ class LLMClient:
         api_key: str,
         model: Optional[str] = None,
         azure_endpoint: Optional[str] = None,
-        azure_api_version: str = "2024-02-15-preview"
+        azure_api_version: str = "2024-02-15-preview",
+        ollama_base_url: Optional[str] = None,
     ):
         """Initialize the LLM client.
         
         Args:
-            provider: LLM provider ("openai", "azure_openai", "anthropic", or "google")
+            provider: LLM provider ("openai", "azure_openai", "anthropic", "google", "grove", or "ollama")
             api_key: API key for the provider
             model: Specific model to use (uses provider default if None).
                    For azure_openai, this is the deployment name (required).
             azure_endpoint: Azure OpenAI endpoint URL (required for azure_openai)
                            Example: "https://your-resource.openai.azure.com/"
             azure_api_version: Azure OpenAI API version (default: "2024-02-15-preview")
+            ollama_base_url: Base URL for Ollama's OpenAI-compatible endpoint.
+                Defaults to "http://localhost:11434/v1"
             
         Raises:
             ValueError: If provider is not supported or Azure config is missing
@@ -68,6 +73,7 @@ class LLMClient:
         self._api_key = api_key
         self._azure_endpoint = azure_endpoint
         self._azure_api_version = azure_api_version
+        self._ollama_base_url = ollama_base_url or self.OLLAMA_BASE_URL
         self._client = None
         
         # Initialize the appropriate client
@@ -104,6 +110,14 @@ class LLMClient:
                 base_url=self.GROVE_BASE_URL,
                 default_headers={"api-key": self._api_key},
             )
+
+        elif self.provider == "ollama":
+            from openai import OpenAI
+            # Ollama exposes an OpenAI-compatible API at /v1.
+            self._client = OpenAI(
+                api_key=self._api_key or "ollama",
+                base_url=self._ollama_base_url,
+            )
     
     def chat(
         self,
@@ -119,7 +133,7 @@ class LLMClient:
         Returns:
             The assistant's response text
         """
-        if self.provider in ("openai", "azure_openai", "grove"):
+        if self.provider in ("openai", "azure_openai", "grove", "ollama"):
             return self._chat_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_anthropic(messages, system_prompt)
@@ -140,7 +154,7 @@ class LLMClient:
         Yields:
             Chunks of the assistant's response text
         """
-        if self.provider in ("openai", "azure_openai", "grove"):
+        if self.provider in ("openai", "azure_openai", "grove", "ollama"):
             yield from self._stream_openai(messages, system_prompt)
         elif self.provider == "anthropic":
             yield from self._stream_anthropic(messages, system_prompt)
@@ -166,7 +180,7 @@ class LLMClient:
             - {"type": "tool_call", "name": str, "arguments": dict} for single tool call
             - {"type": "tool_calls", "calls": [{"name": str, "arguments": dict}, ...]} for multiple tool calls
         """
-        if self.provider in ("openai", "azure_openai", "grove"):
+        if self.provider in ("openai", "azure_openai", "grove", "ollama"):
             return self._chat_with_tools_openai(messages, tools, system_prompt)
         elif self.provider == "anthropic":
             return self._chat_with_tools_anthropic(messages, tools, system_prompt)

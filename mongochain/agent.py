@@ -48,7 +48,7 @@ class MongoAgent:
             persona: The agent's personality/system prompt
             mongo_uri: MongoDB Atlas connection string
             llm_api_key: API key for the LLM provider
-            llm_provider: "openai", "azure_openai", "anthropic", "google", or "grove"
+            llm_provider: "openai", "azure_openai", "anthropic", "google", "grove", or "ollama"
             llm_model: Specific model to use (provider default if None).
                        For azure_openai, this is the deployment name.
             collaborators: List of agent names this agent can read memories from
